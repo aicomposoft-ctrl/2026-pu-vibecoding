@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useConversation } from '@elevenlabs/react';
 import { VoiceOrb } from './voice-orb';
 import { TranscriptPanel } from './transcript-panel';
 import type { TranscriptMessage, ConnectionStatus } from '@ai-sales-trainer/shared-types';
@@ -20,6 +21,33 @@ export function ConversationWidget({ conversationId, scenario, onEnd }: Props) {
   const [duration, setDuration] = useState(0);
   const startTimeRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const conversation = useConversation({
+    onConnect: () => {
+      setStatus('connected');
+      startTimer();
+    },
+    onDisconnect: () => {
+      setStatus('disconnected');
+    },
+    onMessage: ({ message, source }) => {
+      const role = source === 'user' ? 'USER' : 'ASSISTANT';
+      const msg: TranscriptMessage = {
+        id: crypto.randomUUID(),
+        role,
+        content: message,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, msg]);
+      saveMessage(msg);
+    },
+    onModeChange: ({ mode }) => {
+      setIsSpeaking(mode === 'speaking');
+    },
+    onError: () => {
+      setStatus('error');
+    },
+  });
 
   useEffect(() => {
     return () => {
@@ -45,23 +73,7 @@ export function ConversationWidget({ conversationId, scenario, onEnd }: Props) {
 
       const { signedUrl } = await res.json();
 
-      // ElevenLabs Conversational AI connection
-      // In production, use @elevenlabs/react useConversation hook
-      // For now, simulate the connection flow
-      setStatus('connected');
-      startTimer();
-
-      // Simulate initial AI greeting
-      setTimeout(() => {
-        const greeting: TranscriptMessage = {
-          id: crypto.randomUUID(),
-          role: 'ASSISTANT',
-          content: `Hello! ${scenario.buyerPersona.split(',')[0]} here. What can I help you with today?`,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, greeting]);
-        saveMessage(greeting);
-      }, 1500);
+      await conversation.startSession({ signedUrl });
     } catch {
       setStatus('error');
     }
@@ -70,6 +82,7 @@ export function ConversationWidget({ conversationId, scenario, onEnd }: Props) {
   async function handleDisconnect() {
     if (timerRef.current) clearInterval(timerRef.current);
 
+    await conversation.endSession();
     setStatus('disconnected');
 
     await fetch(`/api/conversation/${conversationId}/complete`, {
@@ -130,7 +143,7 @@ export function ConversationWidget({ conversationId, scenario, onEnd }: Props) {
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="card flex flex-col items-center justify-center min-h-[400px]">
           <VoiceOrb
-            isActive={status === 'connected'}
+            status={status}
             isSpeaking={isSpeaking}
           />
 

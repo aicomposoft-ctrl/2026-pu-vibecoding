@@ -2,11 +2,23 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/auth-check';
 import { prisma } from '@/lib/db';
 import { startConversationSchema } from '@/lib/validators/conversation';
+import { rateLimit } from '@/lib/api/rate-limit';
+import { RATE_LIMIT_CONFIG, SCENARIOS } from '@ai-sales-trainer/config';
+
+const limiter = rateLimit(RATE_LIMIT_CONFIG.conversation);
+
+const VALID_SCENARIO_IDS = new Set(SCENARIOS.map((s) => s.id));
 
 export async function POST(request: Request) {
   const auth = await requireAuth();
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
+  }
+
+  const userId = (auth.user as Record<string, unknown>).id as string;
+  const { success } = limiter(userId);
+  if (!success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
   const body = await request.json();
@@ -19,7 +31,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const userId = (auth.user as Record<string, unknown>).id as string;
+  if (!VALID_SCENARIO_IDS.has(parsed.data.scenarioId)) {
+    return NextResponse.json(
+      { error: 'Invalid scenario ID' },
+      { status: 400 }
+    );
+  }
 
   const conversation = await prisma.conversation.create({
     data: {
@@ -39,6 +56,10 @@ export async function GET(request: Request) {
   }
 
   const userId = (auth.user as Record<string, unknown>).id as string;
+  const { success } = limiter(userId);
+  if (!success) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+  }
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get('page') ?? '1', 10);
   const pageSize = parseInt(searchParams.get('pageSize') ?? '10', 10);

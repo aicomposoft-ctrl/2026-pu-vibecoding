@@ -6,8 +6,8 @@ services:
     ports:
       - '3000:3000'
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_sales_trainer?schema=public
-      - NEXTAUTH_URL=http://localhost:3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ai_sales_trainer}?schema=public
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-https://localhost:3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
@@ -19,15 +19,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ai_sales_trainer
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password is required}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_sales_trainer}
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
       interval: 5s
       timeout: 5s
       retries: 5
