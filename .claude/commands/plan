@@ -1,0 +1,4 @@
+#!/bin/bash
+# /plan - Plan feature implementation
+# Usage: /plan [feature-name]
+# Invokes @planner agent with feature description

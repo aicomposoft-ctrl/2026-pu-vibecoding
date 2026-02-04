@@ -1,0 +1,3 @@
+#!/bin/bash
+# /deploy - Deploy to Coolify
+# Checks tests → builds Docker → pushes to main → triggers webhook
